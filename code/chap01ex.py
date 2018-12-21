@@ -9,9 +9,10 @@ from __future__ import print_function
 
 import numpy as np
 import sys
+#para usar defaultdict hay que importar collections
 
-import nsfg
-import thinkstats2
+#import nsfg
+import ThinkStats2.code.thinkstats2 as thinkstats2
 
 
 def main(script):
@@ -21,6 +22,118 @@ def main(script):
     """
     print('%s: All tests passed.' % script)
 
+def ReadFemResp(dct_file='2002FemResp.dct',
+                dat_file='2002FemResp.dat.gz',
+                nrows=None):
+    """Reads the NSFG respondent data.
+
+    dct_file: string file name
+    dat_file: string file name
+
+    returns: DataFrame
+    """
+    dct = thinkstats2.ReadStataDct(dct_file)
+    df = dct.ReadFixedWidth(dat_file, compression='gzip', nrows=nrows)
+    CleanFemResp(df)
+    return df
+
+
+def CleanFemResp(df):
+    """Recodes variables from the respondent frame.
+
+    df: DataFrame
+    """
+    pass
+
+
+def ReadFemPreg(dct_file='2002FemPreg.dct',
+                dat_file='2002FemPreg.dat.gz'):
+    """Reads the NSFG pregnancy data.
+
+    dct_file: string file name
+    dat_file: string file name
+
+    returns: DataFrame
+    """
+    dct = thinkstats2.ReadStataDct(dct_file)
+    df = dct.ReadFixedWidth(dat_file, compression='gzip')
+    CleanFemPreg(df)
+    return df
+
+
+def CleanFemPreg(df):
+    """Recodes variables from the pregnancy frame.
+
+    df: DataFrame
+    """
+    # mother's age is encoded in centiyears; convert to years
+    df.agepreg /= 100.0
+
+    # birthwgt_lb contains at least one bogus value (51 lbs)
+    # replace with NaN
+    df.loc[df.birthwgt_lb > 20, 'birthwgt_lb'] = np.nan
+
+    # replace 'not ascertained', 'refused', 'don't know' with NaN
+    na_vals = [97, 98, 99]
+    df.birthwgt_lb.replace(na_vals, np.nan, inplace=True)
+    df.birthwgt_oz.replace(na_vals, np.nan, inplace=True)
+    df.hpagelb.replace(na_vals, np.nan, inplace=True)
+
+    df.babysex.replace([7, 9], np.nan, inplace=True)
+    df.nbrnaliv.replace([9], np.nan, inplace=True)
+
+    # birthweight is stored in two columns, lbs and oz.
+    # convert to a single column in lb
+    # NOTE: creating a new column requires dictionary syntax,
+    # not attribute assignment (like df.totalwgt_lb)
+    df['totalwgt_lb'] = df.birthwgt_lb + df.birthwgt_oz / 16.0
+
+    # due to a bug in ReadStataDct, the last variable gets clipped;
+    # so for now set it to NaN
+    df.cmintvw = np.nan
+
+
+# def ValidatePregnum(resp, preg):
+    """Validate pregnum in the respondent file.
+
+    resp: respondent DataFrame
+    preg: pregnancy DataFrame
+    """
+    # # make the map from caseid to list of pregnancy indices
+    # preg_map = MakePregMap(preg)
+    #
+    # # iterate through the respondent pregnum series
+    # for index, pregnum in resp.pregnum.iteritems():
+    #     caseid = resp.caseid[index]
+    #     indices = preg_map[caseid]
+    #
+    #     # check that pregnum from the respondent file equals
+    #     # the number of records in the pregnancy file
+    #     if len(indices) != pregnum:
+    #         print(caseid, len(indices), pregnum)
+    #         return False
+    #
+    # return True
+
+def valpregnum(dataf, dict):
+    for index, pregnum in dataf.pregnum.iteritems():
+        caseid = dataf.caseid[index]
+        indices = dict[caseid]
+        if len(indices) != pregnum:
+            print(caseid, len(indices), pregnum)
+
+def MakePregMap(df):
+    """Make a map from caseid to list of preg indices.
+
+    df: DataFrame
+
+    returns: dict that maps from caseid to list of indices into `preg`
+    """
+    d = defaultdict(list)
+    for index, caseid in df.caseid.iteritems():
+        d[caseid].append(index)
+    return d
 
 if __name__ == '__main__':
-    main(*sys.argv)
+    #main(*sys.argv)
+    ReadFemResp()
